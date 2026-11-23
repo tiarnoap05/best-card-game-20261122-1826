@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ember Sigil Duel — a card duel</title>
+<style>
+  :root{
+    --felt:#173d2b; --felt2:#0f2c1f; --gold:#e8b64c; --gold2:#f5d67b;
+    --ink:#f3ead2; --muted:#b9ad8d; --red:#e5484d; --blue:#3b82f6;
+    --green:#22c55e; --amber:#f59e0b; --panel:#10241a; --panel2:#1c4a33;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:#08130d;}
+  body{font-family:Georgia,'Times New Roman',serif; color:var(--ink);}
+  #app{position:fixed; inset:0; display:flex; flex-direction:column;
+    background:radial-gradient(120% 90% at 50% 0%, #21573c 0%, var(--felt) 45%, var(--felt2) 100%);}
+  .screen{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:18px;}
+  .hidden{display:none !important;}
+
+  /* ---------- title ---------- */
+  #screen-title h1{font-size:64px; letter-spacing:6px; color:var(--gold2);
+    text-shadow:0 3px 0 #7a5a12, 0 8px 24px rgba(0,0,0,.6); text-align:center; line-height:1.05;}
+  #screen-title h1 .flame{color:#ff7a3c;}
+  #screen-title .tag{margin-top:10px; font-size:19px; color:var(--ink); font-style:italic;}
+  #screen-title .fan{display:flex; gap:10px; margin:26px 0 8px;}
+  #screen-title .fan .card{transform:rotate(var(--r,0deg));}
+  .howto{max-width:640px; text-align:center; color:var(--muted); font-size:15px; line-height:1.55; margin-top:14px;}
+  .howto b{color:var(--ink);}
+  .btn{cursor:pointer; border:2px solid var(--gold); background:linear-gradient(180deg,#8a6420,#5d430f);
+    color:#ffe9a8; font-family:inherit; font-size:20px; font-weight:bold; letter-spacing:2px;
+    padding:14px 34px; border-radius:10px; margin-top:22px; box-shadow:0 4px 0 #3a2a08, 0 10px 24px rgba(0,0,0,.5);}
+  .btn:hover{filter:brightness(1.15);}
+  .btn:disabled{opacity:.45; cursor:default;}
+  .btn.small{font-size:15px; padding:9px 18px; margin-top:0;}
+  .best{margin-top:16px; color:var(--muted); font-size:14px;}
+
+  /* ---------- play table ---------- */
+  #screen-play{justify-content:flex-start; padding:10px 22px 14px;}
+  header{width:100%; max-width:1180px; display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  header .brand{font-size:22px; letter-spacing:3px; color:var(--gold2); font-weight:bold;}
+  header .meta{font-size:15px; color:var(--ink);}
+  header .meta b{color:var(--gold2);}
+  .zone{width:100%; max-width:1180px; display:flex; align-items:center; gap:14px; margin-top:8px;}
+  .who{width:210px; flex:none;}
+  .who .nm{font-size:17px; font-weight:bold; letter-spacing:1px;}
+  .who .nm small{display:block; font-size:12px; color:var(--muted); font-weight:normal; letter-spacing:0;}
+  .bar{height:20px; background:#08130d; border:1px solid #4a3d1e; border-radius:10px; overflow:hidden; margin-top:5px;}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,#37c26a,#7ee2a0); transition:width .3s;}
+  .bar.ai > i{background:linear-gradient(90deg,#d33,#ff7a6e);}
+  .hpnum{font-size:13px; color:var(--ink); margin-top:3px;}
+  .chips{display:flex; gap:6px; margin-top:5px;}
+  .chip{font-size:12px; background:#0a1a12; border:1px solid #4a3d1e; border-radius:20px; padding:2px 9px; color:var(--ink);}
+  .chip.mana{color:#8ecbff;} .chip.shield{color:#ffd166;}
+  .hand{display:flex; gap:8px; align-items:center; flex:1; min-height:150px; flex-wrap:wrap;}
+  .hand .count{font-size:13px; color:var(--muted);}
+  .cardback{width:74px; height:106px; border-radius:8px; flex:none;
+    background:repeating-linear-gradient(45deg,#5d2a12 0 8px,#7a3a16 8px 16px);
+    border:2px solid var(--gold); display:flex; align-items:center; justify-content:center;
+    font-size:30px; color:var(--gold2); box-shadow:0 4px 10px rgba(0,0,0,.45);}
+  #table{width:100%; max-width:1180px; flex:1; display:flex; align-items:center; justify-content:center; gap:26px; min-height:170px;}
+  #table .mid{text-align:center; max-width:520px;}
+  #table .banner{font-size:21px; color:var(--gold2); letter-spacing:1px; min-height:28px;}
+  #table .sub{font-size:14px; color:var(--muted); margin-top:4px; min-height:20px;}
+  #log{width:300px; flex:none; background:rgba(0,0,0,.28); border:1px solid #3c5a46; border-radius:10px;
+    padding:10px 12px; font-size:13px; line-height:1.5; color:#d8cfae; min-height:120px;}
+  #log div{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #log .you{color:#9fe8b4;} #log .foe{color:#ffb3a7;} #log .sys{color:var(--gold2);}
+  #controls{width:100%; max-width:1180px; display:flex; align-items:center; justify-content:center; gap:14px; margin-top:6px;}
+  #hint{font-size:13px; color:var(--muted);}
+
+  /* ---------- cards ---------- */
+  .card{width:112px; height:158px; border-radius:10px; flex:none; cursor:pointer; position:relative;
+    background:linear-gradient(180deg,#fff8e6,#f0e2bd); color:#241c08; border:2px solid #8a6d2f;
+    box-shadow:0 5px 12px rgba(0,0,0,.5); transition:transform .12s, box-shadow .12s; user-select:none;}
+  .card:hover{transform:translateY(-10px);}
+  .card.sel{transform:translateY(-20px); box-shadow:0 0 0 3px var(--gold), 0 12px 22px rgba(0,0,0,.6);}
+  .card.dim{opacity:.55;}
+  .card .cost{position:absolute; top:6px; left:6px; width:28px; height:28px; border-radius:50%;
+    background:#1d4ed8; color:#fff; font-size:16px; font-weight:bold; display:flex; align-items:center; justify-content:center;
+    border:2px solid #93c5fd; font-family:Arial,sans-serif;}
+  .card .cname{position:absolute; top:8px; left:38px; right:6px; font-size:12.5px; font-weight:bold; line-height:1.15;}
+  .card .art{position:absolute; top:34px; left:0; right:0; text-align:center; font-size:46px; line-height:1;}
+  .card .power{position:absolute; top:82px; left:0; right:0; text-align:center; font-size:22px; font-weight:bold;}
+  .card .power small{font-size:12px; display:inline; letter-spacing:2px; color:#6b5a2e; margin-left:2px;}
+  .card .ctext{position:absolute; top:112px; left:6px; right:6px; text-align:center; font-size:11px; color:#4a3d1e; line-height:1.25;}
+  .card .suit{position:absolute; bottom:5px; left:0; right:0; text-align:center; font-size:10px; letter-spacing:3px; color:#8a6d2f; font-weight:bold;}
+  .card.ember .art,.card.ember .power{color:#dc2626;}
+  .card.tide .art,.card.tide .power{color:#2563eb;}
+  .card.leaf .art,.card.leaf .power{color:#16a34a;}
+  .card.stone .art,.card.stone .power{color:#b45309;}
+  .card.big{width:132px; height:186px; cursor:default;}
+  .card.big:hover{transform:none;}
+  .card.big .art{font-size:56px; top:44px;} .card.big .power{top:100px; font-size:26px;}
+  .card.big .ctext{top:130px; font-size:12px;}
+
+  /* ---------- end screens ---------- */
+  #screen-win h1, #screen-loss h1{font-size:72px; letter-spacing:8px;}
+  #screen-win h1{color:var(--gold2); text-shadow:0 4px 0 #7a5a12, 0 10px 30px rgba(0,0,0,.6);}
+  #screen-loss h1{color:#ff6b5e; text-shadow:0 4px 0 #4d0f0a, 0 10px 30px rgba(0,0,0,.6);}
+  .stats{display:flex; gap:14px; margin-top:22px;}
+  .stat{background:rgba(0,0,0,.3); border:1px solid #4a3d1e; border-radius:10px; padding:12px 20px; text-align:center;}
+  .stat b{display:block; font-size:28px; color:var(--gold2);}
+  .stat span{font-size:12px; letter-spacing:2px; color:var(--muted);}
+  .endnote{margin-top:14px; color:var(--muted); font-style:italic; font-size:16px;}
+  #status{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- TITLE -->
+  <section id="screen-title" class="screen">
+    <h1><span class="flame">🔥</span> EMBER SIGIL DUEL</h1>
+    <p class="tag">A duel of sigil cards against Vex, the Clockwork Mage</p>
+    <div class="fan" id="title-fan"></div>
+    <p class="howto">You and Vex each hold <b>30 life</b>. Play cards from your hand to
+      <b>strike</b>, raise a <b>ward</b>, <b>mend</b> your wounds or draw <b>insight</b>.
+      Cards cost mana — it grows every turn. Play two cards of the same sigil in a row for a
+      <b>+2 combo</b>. Reduce Vex to 0 life before yours runs out.</p>
+    <button class="btn" id="btn-start">ENTER THE DUEL</button>
+    <p class="best" id="best-line">Best score: 0 &nbsp;•&nbsp; Keys: 1–7 select &nbsp;•&nbsp; Enter play &nbsp;•&nbsp; E end turn &nbsp;•&nbsp; R restart</p>
+  </section>
+
+  <!-- PLAY -->
+  <section id="screen-play" class="screen hidden">
+    <header>
+      <div class="brand">EMBER SIGIL DUEL</div>
+      <div class="meta">Turn <b id="m-turn">1</b> &nbsp;•&nbsp; Score <b id="m-score">0</b> &nbsp;•&nbsp; Wins <b id="m-wins">0</b></div>
+      <div>
+        <button class="btn small" id="btn-sound">Sound: on</button>
+        <button class="btn small" id="btn-new">New game</button>
+      </div>
+    </header>
+
+    <div class="zone">
+      <div class="who">
+        <div class="nm">VEX<small>The Clockwork Mage • rival</small></div>
+        <div class="bar ai"><i id="ai-hpbar" style="width:100%"></i></div>
+        <div class="hpnum" id="ai-hpnum">30 / 30 HP</div>
+        <div class="chips"><span class="chip shield" id="ai-shield">Shield 0</span><span class="chip mana" id="ai-mana">Mana 1/1</span></div>
+      </div>
+      <div class="hand" id="ai-hand"></div>
+    </div>
+
+    <div id="table">
+      <div class="mid">
+        <div class="banner" id="banner">Your turn</div>
+        <div class="sub" id="sub">Play a card or end your turn</div>
+        <div id="played-slot" style="display:flex;justify-content:center;margin-top:10px;min-height:186px;"></div>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <div class="zone">
+      <div class="who">
+        <div class="nm">YOU<small>Sigil duelist</small></div>
+        <div class="bar"><i id="pl-hpbar" style="width:100%"></i></div>
+        <div class="hpnum" id="pl-hpnum">30 / 30 HP</div>
+        <div class="chips"><span class="chip shield" id="pl-shield">Shield 0</span><span class="chip mana" id="pl-mana">Mana 1/1</span></div>
+      </div>
+      <div class="hand" id="pl-hand"></div>
+    </div>
+
+    <div id="controls">
+      <button class="btn small" id="btn-play" disabled>Play card</button>
+      <button class="btn small" id="btn-end">End turn (E)</button>
+      <span id="hint">Click a card to select it, double-click to play. Keys 1–7 select, Enter plays.</span>
+    </div>
+  </section>
+
+  <!-- WIN -->
+  <section id="screen-win" class="screen hidden">
+    <h1>VICTORY!</h1>
+    <p class="endnote">Vex's sigils shatter. The duel is yours.</p>
+    <div class="stats" id="win-stats"></div>
+    <button class="btn" id="btn-again-win">DUEL AGAIN</button>
+  </section>
+
+  <!-- LOSS -->
+  <section id="screen-loss" class="screen hidden">
+    <h1>DEFEAT</h1>
+    <p class="endnote">Vex bows, gears humming. Your sigils fade — for now.</p>
+    <div class="stats" id="loss-stats"></div>
+    <button class="btn" id="btn-again-loss">TRY AGAIN</button>
+  </section>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+
+<script>
+'use strict';
+/* ================= Ember Sigil Duel — a 1v-1 battle card game vs an AI rival.
+   Original design: four elemental sigils, mana, combo chains, 30 life each. */
+const SUITS = [
+  { id:'ember', sym:'\u2665', color:'#dc2626', name:'Ember' },
+  { id:'tide',  sym:'\u2660', color:'#2563eb', name:'Tide'  },
+  { id:'leaf',  sym:'\u2663', color:'#16a34a', name:'Leaf'  },
+  { id:'stone', sym:'\u2666', color:'#b45309', name:'Stone' },
+];
+const TYPES = {
+  strike:  { label:'Strike',  text:v=>'Deal '+v+' damage',  verb:'strikes for' },
+  guard:   { label:'Ward',    text:v=>'Gain '+v+' shield',  verb:'wards +' },
+  mend:    { label:'Mend',    text:v=>'Restore '+v+' HP',    verb:'mends +' },
+  insight: { label:'Insight', text:()=>'Draw 2 cards',      verb:'draws' },
+};
+const MAX_HP = 30, HAND_MAX = 7, MANA_MAX = 10;
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function shuffle(arr, rng){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); const t=arr[i]; arr[i]=arr[j]; arr[j]=t; } return arr; }
+function buildDeck(rng){
+  const deck = [];
+  for (const s of SUITS){
+    deck.push({suit:s.id,type:'strike',cost:1,value:5});
+    deck.push({suit:s.id,type:'strike',cost:2,value:7});
+    deck.push({suit:s.id,type:'strike',cost:3,value:9});
+    deck.push({suit:s.id,type:'guard',cost:1,value:3});
+    deck.push({suit:s.id,type:'guard',cost:2,value:4});
+    deck.push({suit:s.id,type:'mend',cost:2,value:5});
+    deck.push({suit:s.id,type:'insight',cost:1,value:0});
+  }
+  return shuffle(deck, rng);
+}
+function suitOf(id){ return SUITS.find(s=>s.id===id); }
+function cardName(c){ return suitOf(c.suit).name + ' ' + TYPES[c.type].label; }
+function cardText(c){ return TYPES[c.type].text(c.value); }
+
+/* ---------- state ---------- */
+let rng = mulberry32(1);
+let S = null;             // game state
+let soundOn = true, audioCtx = null;
+let bestScore = 0;
+try { bestScore = +(localStorage.getItem('ember-sigil-best') || 0); } catch(e) {}
+
+function newSide(r){ return { hp:MAX_HP, maxHp:MAX_HP, mana:1, maxMana:1, shield:0,
+  hand:[], deck:buildDeck(r), discard:[], lastSuit:null }; }
+function newGame(seed){
+  rng = mulberry32(seed || 1);
+  S = { turn:1, phase:'player', score:0, wins:0, selected:null, lastPlayed:null,
+    log:[], stats:{ damage:0, played:0, healed:0 },
+    player:newSide(rng), ai:newSide(rng) };
+  drawCards(S.player, 4); drawCards(S.ai, 4);
+  logMsg('sys', 'The duel begins — your move, duelist.');
+  showScreen('play');
+  setBanner('Your turn', 'Play a card or end your turn');
+  render();
+}
+function drawCards(who, n){
+  for (let i=0;i<n;i++){
+    if (who.deck.length === 0){
+      if (who.discard.length === 0) break;
+      who.deck = shuffle(who.discard, rng); who.discard = [];
+    }
+    if (who.hand.length >= HAND_MAX){ who.discard.push(who.deck.pop()); continue; }
+    who.hand.push(who.deck.pop());
+  }
+}
+function applyDamage(who, dmg){
+  const absorbed = Math.min(who.shield, dmg);
+  who.shield -= absorbed;
+  who.hp = Math.max(0, who.hp - (dmg - absorbed));
+  return dmg - absorbed;
+}
+/** Play hand[idx] for `who` against `foe`. Returns true when played. */
+function playCard(who, idx, foe){
+  const card = who.hand[idx];
+  if (!card || who.mana < card.cost) return false;
+  who.mana -= card.cost;
+  who.hand.splice(idx, 1);
+  const combo = (who.lastSuit === card.suit) ? 2 : 0;
+  who.lastSuit = card.suit;
+  const v = card.value + combo;
+  let line;
+  if (card.type === 'strike'){
+    const dealt = applyDamage(foe, v);
+    line = cardName(card) + ' ' + TYPES.strike.verb + ' ' + dealt + ' damage' + (combo ? ' (combo +2!)' : '');
+    if (who === S.player){ S.stats.damage += dealt; S.score += dealt; }
+  } else if (card.type === 'guard'){
+    who.shield += v; line = cardName(card) + ' ' + TYPES.guard.verb + v + ' shield' + (combo ? ' (combo +2!)' : '');
+  } else if (card.type === 'mend'){
+    const healed = Math.min(who.maxHp - who.hp, v);
+    who.hp += healed; line = cardName(card) + ' ' + TYPES.mend.verb + healed + ' HP' + (combo ? ' (combo +2!)' : '');
+    if (who === S.player) S.stats.healed += healed;
+  } else {
+    drawCards(who, 2); line = cardName(card) + ' draws 2 cards' + (combo ? ' (combo!)' : '');
+  }
+  if (who === S.player) S.stats.played++;
+  who.discard.push(card);
+  S.lastPlayed = { card, by: who === S.player ? 'you' : 'vex' };
+  logMsg(who === S.player ? 'you' : 'foe', line);
+  blip(card.type === 'strike' ? 520 : 660, 0.07);
+  render();
+  return checkEnd();
+}
+/** true when the game just ended. */
+function checkEnd(){
+  if (S.ai.hp <= 0){ endGame(true); return true; }
+  if (S.player.hp <= 0){ endGame(false); return true; }
+  return false;
+}
+function endGame(won){
+  if (won){ S.wins++; S.score += 100; bestScore = Math.max(bestScore, S.score);
+    try { localStorage.setItem('ember-sigil-best', String(bestScore)); } catch(e) {}
+    logMsg('sys', 'Victory! Vex falls.');
+    blip(880, 0.15); setTimeout(()=>blip(1174, 0.2), 140);
+  } else {
+    logMsg('sys', 'Defeat. Vex stands over the table.');
+    blip(220, 0.25);
+  }
+  showEnd(won);
+}
+function beginTurn(who){
+  who.maxMana = Math.min(MANA_MAX, who.maxMana + 1);
+  who.mana = who.maxMana; who.lastSuit = null;
+  drawCards(who, 1);
+}
+function endPlayerTurn(){
+  if (!S || S.phase !== 'player') return;
+  S.phase = 'ai'; S.selected = null;
+  setBanner("Vex's turn", 'The Clockwork Mage is thinking…');
+  render();
+  setTimeout(aiTurn, 650);
+}
+function aiTurn(){
+  if (!S || S.phase !== 'ai') return;
+  const step = () => {
+    if (!S || S.phase !== 'ai') return;
+    const pick = aiChoose(S.ai);
+    if (pick < 0){ // AI done: back to the player
+      S.turn++;
+      beginTurn(S.player);
+      S.phase = 'player';
+      setBanner('Your turn', 'Play a card or end your turn');
+      logMsg('sys', 'Turn ' + S.turn + ' — your move.');
+      render();
+      return;
+    }
+    if (playCard(S.ai, pick, S.player)) return; // game ended inside playCard
+    setTimeout(step, 750);
+  };
+  step();
+}
+/** AI: pick the best affordable card, or -1 to pass. */
+function aiChoose(ai){
+  let best = -1, bestScore = 0; // always play something affordable: a full hand of
+  // wards and mends must still cycle, or strikes drawn later get burned.
+  for (let i=0;i<ai.hand.length;i++){
+    const c = ai.hand[i];
+    if (c.cost > ai.mana) continue;
+    const combo = (ai.lastSuit === c.suit) ? 2 : 0;
+    let s;
+    if (c.type === 'strike') s = c.value + combo;
+    else if (c.type === 'guard') s = (ai.hp < 20 ? 0.4 : 0.3) * (c.value + combo);
+    else if (c.type === 'mend') s = (ai.hp <= 12 ? 1.1 : 0.3) * (c.value + combo);
+    else s = 3;
+    if (s > bestScore){ bestScore = s; best = i; }
+  }
+  return best;
+}
+
+/* ---------- autopilot (used to stage the ?shot= screenshots) ---------- */
+/* mode: 'strong' attacks at full value, 'weak' strikes at a quarter weight (a cautious
+   rival), 'passive' never strikes — used only to stage a win or a loss screenshot. */
+function autoTurn(who, foe, mode, maxPlays, keepMin){
+  let played = 0;
+  while (played < (maxPlays || 5)){
+    if (who.hand.length <= (keepMin || 0)) break;
+    let pick = -1, ps = 0; // always play the best affordable card: a hand of wards
+    // and mends must still cycle, or strikes drawn later get burned at a full hand.
+    for (let i=0;i<who.hand.length;i++){
+      const c = who.hand[i];
+      if (c.cost > who.mana) continue;
+      const combo = (who.lastSuit === c.suit) ? 2 : 0;
+      let s;
+      if (c.type === 'strike') s = mode === 'strong' ? c.value + combo : mode === 'passive' ? -1 : (c.value + combo) * 0.25;
+      else if (c.type === 'guard') s = who.hp < 18 ? (c.value + combo) * 0.6 : 1;
+      else if (c.type === 'mend') s = who.hp <= 12 ? (c.value + combo) * 1.3 : 0.5;
+      else s = 2.5;
+      if (s > ps){ ps = s; pick = i; }
+    }
+    if (pick < 0) break;
+    if (playCard(who, pick, foe)) return true;
+    played++;
+  }
+  return false;
+}
+function autoDuel(winner){
+  for (let r=0;r<40;r++){
+    if (autoTurn(S.player, S.ai, winner === 'player' ? 'strong' : 'passive')) return;
+    if (S.phase !== 'player') S.phase = 'player';
+    beginTurn(S.ai);
+    if (autoTurn(S.ai, S.player, winner === 'ai' ? 'strong' : 'passive')) return;
+    S.turn++;
+    beginTurn(S.player);
+  }
+  // Deterministic fallback: force the staged result.
+  if (winner === 'player'){ S.ai.hp = 0; endGame(true); }
+  else { S.player.hp = 0; endGame(false); }
+}
+
+/* ---------- rendering ---------- */
+const $ = id => document.getElementById(id);
+function showScreen(name){
+  for (const n of ['title','play','win','loss']) $('screen-'+n).classList.toggle('hidden', n !== name);
+}
+function logMsg(cls, text){
+  S.log.push({ cls, text });
+  if (S.log.length > 6) S.log.shift();
+}
+function setBanner(a, b){ $('banner').textContent = a; $('sub').textContent = b; }
+function cardEl(card, opts){
+  opts = opts || {};
+  const s = suitOf(card.suit);
+  const el = document.createElement('div');
+  el.className = 'card ' + card.suit + (opts.big ? ' big' : '') + (opts.dim ? ' dim' : '') + (opts.sel ? ' sel' : '');
+  const powerLabel = card.type === 'strike' ? 'DMG' : card.type === 'guard' ? 'SHIELD' : card.type === 'mend' ? 'HEAL' : 'DRAW';
+  const powerVal = card.type === 'insight' ? '2' : String(card.value);
+  el.innerHTML = '<div class="cost">' + card.cost + '</div>' +
+    '<div class="cname">' + cardName(card) + '</div>' +
+    '<div class="art" style="color:' + s.color + '">' + s.sym + '</div>' +
+    '<div class="power">' + powerVal + '<small>' + powerLabel + '</small></div>' +
+    '<div class="ctext">' + cardText(card) + '</div>' +
+    '<div class="suit">' + s.name.toUpperCase() + ' SIGIL</div>';
+  return el;
+}
+function render(){
+  if (!S) return;
+  $('m-turn').textContent = S.turn;
+  $('m-score').textContent = S.score;
+  $('m-wins').textContent = S.wins;
+  // AI zone
+  $('ai-hpbar').style.width = (100 * S.ai.hp / S.ai.maxHp) + '%';
+  $('ai-hpnum').textContent = S.ai.hp + ' / ' + S.ai.maxHp + ' HP';
+  $('ai-shield').textContent = 'Shield ' + S.ai.shield;
+  $('ai-mana').textContent = 'Mana ' + S.ai.mana + '/' + S.ai.maxMana;
+  const ah = $('ai-hand'); ah.innerHTML = '';
+  S.ai.hand.forEach(()=>{ const b = document.createElement('div'); b.className = 'cardback'; b.textContent = '✦'; ah.appendChild(b); });
+  const ac = document.createElement('span'); ac.className = 'count'; ac.textContent = 'Hand: ' + S.ai.hand.length + ' cards';
+  ah.appendChild(ac);
+  // player zone
+  $('pl-hpbar').style.width = (100 * S.player.hp / S.player.maxHp) + '%';
+  $('pl-hpnum').textContent = S.player.hp + ' / ' + S.player.maxHp + ' HP';
+  $('pl-shield').textContent = 'Shield ' + S.player.shield;
+  $('pl-mana').textContent = 'Mana ' + S.player.mana + '/' + S.player.maxMana;
+  const ph = $('pl-hand'); ph.innerHTML = '';
+  S.player.hand.forEach((card, i)=>{
+    const el = cardEl(card, { sel: S.selected === i, dim: S.phase !== 'player' || card.cost > S.player.mana });
+    el.title = cardName(card) + ' — cost ' + card.cost + ' mana. ' + cardText(card);
+    el.addEventListener('click', ()=>{ if (S.phase !== 'player') return; S.selected = (S.selected === i ? null : i); render(); });
+    el.addEventListener('dblclick', ()=>{ if (S.phase !== 'player') return; S.selected = i; tryPlaySelected(); });
+    ph.appendChild(el);
+  });
+  // played card + log
+  const slot = $('played-slot'); slot.innerHTML = '';
+  if (S.lastPlayed){
+    const el = cardEl(S.lastPlayed.card, { big:true });
+    const tag = document.createElement('div');
+    tag.style.cssText = 'font-size:13px;color:var(--muted);margin-top:6px;';
+    tag.textContent = S.lastPlayed.by === 'you' ? '— you played —' : '— Vex played —';
+    const wrap = document.createElement('div'); wrap.appendChild(el); wrap.appendChild(tag);
+    slot.appendChild(wrap);
+  }
+  const lg = $('log'); lg.innerHTML = '';
+  S.log.forEach(m=>{ const d = document.createElement('div'); d.className = m.cls; d.textContent = m.text; lg.appendChild(d); });
+  $('btn-play').disabled = !(S.phase === 'player' && S.selected !== null && S.player.hand[S.selected] && S.player.hand[S.selected].cost <= S.player.mana);
+  $('btn-end').disabled = S.phase !== 'player';
+  $('status').textContent = 'Turn ' + S.turn + '. You have ' + S.player.hp + ' life, Vex has ' + S.ai.hp + '.';
+}
+function statsHtml(){
+  return '<div class="stat"><b>' + S.turn + '</b><span>TURNS</span></div>' +
+    '<div class="stat"><b>' + S.stats.damage + '</b><span>DAMAGE</span></div>' +
+    '<div class="stat"><b>' + S.stats.played + '</b><span>CARDS PLAYED</span></div>' +
+    '<div class="stat"><b>' + S.score + '</b><span>SCORE</span></div>';
+}
+function showEnd(won){
+  if (won){ $('win-stats').innerHTML = statsHtml(); showScreen('win'); }
+  else { $('loss-stats').innerHTML = statsHtml(); showScreen('loss'); }
+  render();
+}
+function tryPlaySelected(){
+  if (!S || S.phase !== 'player' || S.selected === null) return;
+  const i = S.selected; S.selected = null;
+  if (!playCard(S.player, i, S.ai)) render();
+}
+
+/* ---------- sound (tiny synth, no files) ---------- */
+function blip(freq, dur){
+  if (!soundOn) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+
+/* ---------- title fan ---------- */
+function renderTitleFan(){
+  const fan = $('title-fan'); fan.innerHTML = '';
+  const sample = [
+    { suit:'ember', type:'strike', cost:3, value:9 },
+    { suit:'tide',  type:'guard',  cost:2, value:4 },
+    { suit:'leaf',  type:'mend',   cost:2, value:5 },
+    { suit:'stone', type:'strike', cost:2, value:7 },
+    { suit:'ember', type:'insight',cost:1, value:0 },
+  ];
+  sample.forEach((c, i)=>{
+    const el = cardEl(c, {});
+    el.style.setProperty('--r', ((i - 2) * 4) + 'deg');
+    fan.appendChild(el);
+  });
+  $('best-line').textContent = 'Best score: ' + bestScore + '  •  Keys: 1–7 select  •  Enter play  •  E end turn  •  R restart';
+}
+
+/* ---------- shots: ?shot=start|play|win|loss&seed=N ---------- */
+function stageShot(name, seed){
+  if (name === 'play'){
+    newGame(seed);
+    for (let r=0;r<2;r++){
+      if (autoTurn(S.player, S.ai, 'strong', 1, 0)) break;
+      beginTurn(S.ai);
+      if (autoTurn(S.ai, S.player, 'weak', 1, 3)) break;
+      S.turn++; beginTurn(S.player);
+    }
+    setBanner('Your turn', 'Mid-duel — Vex is at ' + S.ai.hp + ' life');
+    render();
+  } else if (name === 'win'){
+    newGame(seed); autoDuel('player'); render();
+  } else if (name === 'loss'){
+    newGame(seed); autoDuel('ai'); render();
+  } else {
+    renderTitleFan(); showScreen('title');
+  }
+}
+
+/* ---------- wire up ---------- */
+$('btn-start').addEventListener('click', ()=>{ blip(660, 0.08); newGame((Math.random()*1e9)|0); });
+$('btn-play').addEventListener('click', tryPlaySelected);
+$('btn-end').addEventListener('click', endPlayerTurn);
+$('btn-new').addEventListener('click', ()=>newGame((Math.random()*1e9)|0));
+$('btn-again-win').addEventListener('click', ()=>newGame((Math.random()*1e9)|0));
+$('btn-again-loss').addEventListener('click', ()=>newGame((Math.random()*1e9)|0));
+$('btn-sound').addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  $('btn-sound').textContent = 'Sound: ' + (soundOn ? 'on' : 'off');
+});
+document.addEventListener('keydown', (e)=>{
+  if (!S || $('screen-play').classList.contains('hidden')) {
+    if (e.key === 'Enter' && !$('screen-title').classList.contains('hidden')) $('btn-start').click();
+    if ((e.key === 'r' || e.key === 'R') && !$('screen-win').classList.contains('hidden')) $('btn-again-win').click();
+    if ((e.key === 'r' || e.key === 'R') && !$('screen-loss').classList.contains('hidden')) $('btn-again-loss').click();
+    return;
+  }
+  if (e.key >= '1' && e.key <= '7'){
+    const i = +e.key - 1;
+    if (S.player.hand[i]){ S.selected = (S.selected === i ? null : i); render(); }
+  } else if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); tryPlaySelected(); }
+  else if (e.key === 'e' || e.key === 'E'){ endPlayerTurn(); }
+  else if (e.key === 'r' || e.key === 'R'){ newGame((Math.random()*1e9)|0); }
+  else if (e.key === 'Escape'){ S.selected = null; render(); }
+});
+
+/* ---------- boot ---------- */
+(function boot(){
+  const q = new URLSearchParams(location.search);
+  const shot = q.get('shot');
+  const seed = parseInt(q.get('seed') || '1', 10) || 1;
+  if (shot) stageShot(shot, seed);
+  else { renderTitleFan(); showScreen('title'); }
+})();
+</script>
+</body>
+</html>
